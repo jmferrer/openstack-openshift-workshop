@@ -1,0 +1,764 @@
+heat_template_version: 2016-04-08
+
+description: Despliegue de un cluster de Percona
+
+parameters:
+  key_name:
+    type: string
+    label: Key Name
+    description: Name of key-pair to be used for all compute instances
+    constraints:
+      - custom_constraint: nova.keypair
+  image_id:
+    type: string
+    label: Image ID
+    description: Ubuntu 14.04 Image to be used
+    default: e4cb37d7-91c1-4c2a-ab19-162f2017a079
+    constraints:
+      - custom_constraint: glance.image
+  instance_flavor:
+    type: string
+    label: Flavor
+    description: Flavor
+    default: 2
+    constraints:
+      - custom_constraint: nova.flavor
+  public_net_id:
+    type: string
+    label: Public network
+    description: Public network
+    default: 0e2ff1c5-fc78-4dd8-9c6d-5989794e9e71
+  private_net_id:
+    type: string
+    label: Private network
+    description: Private network
+    default: b59e8215-e15c-4fdb-ae7a-475d2780e797
+  private_subnet_id:
+    type: string
+    label: Private Subnet
+    description: Private Subnet
+    default: 96ad9deb-c13c-45b4-8cab-d25bd65b6b50
+  availability_zone_server1:
+    type: string
+    label: Availability Zone Percona 1
+    description: Availability Zone Percona 1
+    default: zone3
+    constraints:
+      - allowed_values:
+        - zone1
+        - zone2
+        - zone3
+  availability_zone_server2:
+    type: string
+    label: Availability Zone Percona 2
+    description: Availability Zone Percona 2
+    default: zone1
+    constraints:
+      - allowed_values:
+        - zone1
+        - zone2
+        - zone3
+  availability_zone_server3:
+    type: string
+    label: Availability Zone Percona 3
+    description: Availability Zone Percona 3
+    default: zone2
+    constraints:
+      - allowed_values:
+        - zone1
+        - zone2
+        - zone3
+  nfs_server_ip:
+    type: string
+    label: NFS Server IP
+    description: NFS Server IP
+    constraints:
+      - allowed_pattern: "[0-9]*.[0-9]*.[0-9]*.[0-9]*"
+        description: User name must start with an uppercase character
+    default: 192.168.3.30
+
+resources:
+  # Security group that allows all from all
+  percona_security_group:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      name: percona_security_group
+      rules:
+        - remote_ip_prefix: 0.0.0.0/0
+          protocol: tcp
+        - remote_ip_prefix: 0.0.0.0/0
+          protocol: icmp
+
+
+  # create server ports (ip addresses)
+  # needed to configure ansible inventory and /etc/hosts
+  percona1_server_port:
+    type: OS::Neutron::Port
+    properties:
+       network: { get_param: private_net_id }
+       security_groups:
+         - { get_resource: percona_security_group }
+
+  percona2_server_port:
+    type: OS::Neutron::Port
+    properties:
+       network: { get_param: private_net_id }
+       security_groups:
+         - { get_resource: percona_security_group }
+
+  percona3_server_port:
+    type: OS::Neutron::Port
+    properties:
+       network: { get_param: private_net_id }
+       security_groups:
+         - { get_resource: percona_security_group }
+
+
+  percona_lb_vip_port:
+    type: OS::Neutron::Port
+    properties:
+      security_groups: [{ get_resource: percona_security_group }]
+      network: { get_param: private_net_id }
+
+  percona_lb_vip_floating_ip:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network_id: { get_param: public_net_id  }
+      port_id: { get_resource: percona_lb_vip_port }
+
+
+  percona1_server:
+    type: OS::Nova::Server
+    properties:
+      name: percona1_server
+      key_name: { get_param: key_name }
+      image: { get_param: image_id }
+      flavor: { get_param: instance_flavor }
+      networks:
+        - port: { get_resource: percona1_server_port }
+      availability_zone: { get_param: availability_zone_server1 }
+      user_data_format: RAW
+      user_data:
+        str_replace:
+          params:
+            __percona1_ip__: { get_attr: [percona1_server_port, fixed_ips, 0, ip_address] }
+            __percona2_ip__: { get_attr: [percona2_server_port, fixed_ips, 0, ip_address] }
+            __percona3_ip__: { get_attr: [percona3_server_port, fixed_ips, 0, ip_address] }
+            __nfs_server_ip__: { get_param: nfs_server_ip }
+          template: |
+            #!/bin/bash
+            # Configure /etc/hosts
+            # This is not necesary in OpenStack Mitaka release
+            echo """
+            __nfs_server_ip__        nfs
+            """ >> /etc/hosts
+
+            export DEBIAN_FRONTEND=noninteractive
+            apt-get update
+            apt-get -y install percona-xtradb-cluster-server
+
+            service mysql stop
+
+            echo """
+            #
+            # The MySQL database server configuration file.
+            #
+            # You can copy this to one of:
+            # - "/etc/mysql/my.cnf" to set global options,
+            # - "~/.my.cnf" to set user-specific options.
+            #
+            # One can use all long options that the program supports.
+            # Run program with --help to get a list of available options and with
+            # --print-defaults to see which it would actually understand and use.
+            #
+            # For explanations see
+            # http://dev.mysql.com/doc/mysql/en/server-system-variables.html
+
+            # This will be passed to all mysql clients
+            # It has been reported that passwords should be enclosed with ticks/quotes
+            # escpecially if they contain "#" chars...
+            # Remember to edit /etc/mysql/debian.cnf when changing the socket location.
+            [client]
+            port		= 3306
+            socket		= /var/run/mysqld/mysqld.sock
+
+            # Here is entries for some specific programs
+            # The following values assume you have at least 32M ram
+
+            # This was formally known as [safe_mysqld]. Both versions are currently parsed.
+            [mysqld_safe]
+            socket		= /var/run/mysqld/mysqld.sock
+            nice		= 0
+
+            [mysqld]
+            #
+            # * Basic Settings
+            #
+            user		= mysql
+            pid-file	= /var/run/mysqld/mysqld.pid
+            socket		= /var/run/mysqld/mysqld.sock
+            port		= 3306
+            basedir		= /usr
+            datadir		= /var/lib/mysql
+            tmpdir		= /tmp
+            lc-messages-dir	= /usr/share/mysql
+            skip-external-locking
+            #
+            # Instead of skip-networking the default is now to listen only on
+            # localhost which is more compatible and is not less secure.
+            #bind-address		= 127.0.0.1
+            #
+            # * Fine Tuning
+            #
+            key_buffer		= 16M
+            max_allowed_packet	= 16M
+            thread_stack		= 192K
+            thread_cache_size       = 8
+            # This replaces the startup script and checks MyISAM tables if needed
+            # the first time they are touched
+            myisam-recover         = BACKUP
+            #max_connections        = 100
+            #table_cache            = 64
+            #thread_concurrency     = 10
+            #
+            # * Query Cache Configuration
+            #
+            query_cache_limit	= 1M
+            query_cache_size        = 16M
+            #
+            # * Logging and Replication
+            #
+            # Both location gets rotated by the cronjob.
+            # Be aware that this log type is a performance killer.
+            # As of 5.1 you can enable the log at runtime!
+            #general_log_file        = /var/log/mysql/mysql.log
+            #general_log             = 1
+            #
+            # Error log - should be very few entries.
+            #
+            log_error = /var/log/mysql/error.log
+            #
+            # Here you can see queries with especially long duration
+            #log_slow_queries	= /var/log/mysql/mysql-slow.log
+            #long_query_time = 2
+            #log-queries-not-using-indexes
+            #
+            # The following can be used as easy to replay backup logs or for replication.
+            # note: if you are setting up a replication slave, see README.Debian about
+            #       other settings you may need to change.
+            #server-id		= 1
+            #log_bin			= /var/log/mysql/mysql-bin.log
+            expire_logs_days	= 10
+            max_binlog_size         = 100M
+            #binlog_do_db		= include_database_name
+            #binlog_ignore_db	= include_database_name
+            #
+            # * InnoDB
+            #
+            # InnoDB is enabled by default with a 10MB datafile in /var/lib/mysql/.
+            # Read the manual for more InnoDB related options. There are many!
+            #
+            # * Security Features
+            #
+            # Read the manual, too, if you want chroot!
+            # chroot = /var/lib/mysql/
+            #
+            # For generating SSL certificates I recommend the OpenSSL GUI "tinyca".
+            #
+            # ssl-ca=/etc/mysql/cacert.pem
+            # ssl-cert=/etc/mysql/server-cert.pem
+            # ssl-key=/etc/mysql/server-key.pem
+
+
+
+            [mysqldump]
+            quick
+            quote-names
+            max_allowed_packet	= 16M
+
+            [mysql]
+            #no-auto-rehash	# faster start of mysql but no tab completition
+
+            [isamchk]
+            key_buffer		= 16M
+
+            #
+            # * IMPORTANT: Additional settings that can override those from this file!
+            #   The files must end with '.cnf', otherwise they'll be ignored.
+            #
+            !includedir /etc/mysql/conf.d/
+
+            """ > /etc/mysql/my.cnf
+
+            echo """
+            [mysqld]
+            # Path to Galera library
+            wsrep_provider=/usr/lib/libgalera_smm.so
+
+            # Cluster connection URL contains the IPs of node#1, node#2 and node#3
+            wsrep_cluster_address=gcomm://__percona1_ip__,__percona2_ip__,__percona3_ip__
+
+
+            # In order for Galera to work correctly binlog format should be ROW
+            binlog_format=ROW
+
+            # MyISAM storage engine has only experimental support
+            default_storage_engine=InnoDB
+
+            # This changes how InnoDB autoincrement locks are managed and is a requirement for Galera
+            innodb_autoinc_lock_mode=2
+
+            # Node #1 address
+            wsrep_node_address=__percona1_ip__
+
+            # SST method
+            wsrep_sst_method=rsync
+
+            # Cluster name
+            wsrep_cluster_name=my_ubuntu_cluster
+
+            # Authentication for SST method
+            #wsrep_sst_auth="sstuser:s3cretPass"
+            """ > /etc/mysql/conf.d/wsrep.cnf
+
+            service mysql bootstrap-pxc
+
+            apt-get -y install python-mysqldb
+
+            echo "grant all privileges on *.* to 'root'@'%' with grant option;" | mysql -u root
+
+
+  percona2_server:
+    type: OS::Nova::Server
+    properties:
+      name: percona2_server
+      key_name: { get_param: key_name }
+      image: { get_param: image_id }
+      flavor: { get_param: instance_flavor }
+      networks:
+        - port: { get_resource: percona2_server_port }
+      availability_zone: { get_param: availability_zone_server2 }
+      user_data_format: RAW
+      user_data:
+        str_replace:
+          params:
+            __percona1_ip__: { get_attr: [percona1_server_port, fixed_ips, 0, ip_address] }
+            __percona2_ip__: { get_attr: [percona2_server_port, fixed_ips, 0, ip_address] }
+            __percona3_ip__: { get_attr: [percona3_server_port, fixed_ips, 0, ip_address] }
+            __nfs_server_ip__: { get_param: nfs_server_ip }
+          template: |
+            #!/bin/bash
+            # Configure /etc/hosts
+            # This is not necesary in OpenStack Mitaka release
+            echo """
+            __nfs_server_ip__        nfs
+            """ >> /etc/hosts
+
+            export DEBIAN_FRONTEND=noninteractive
+            apt-get update
+            apt-get -y install percona-xtradb-cluster-server
+
+            service mysql stop
+
+            echo """
+            #
+            # The MySQL database server configuration file.
+            #
+            # You can copy this to one of:
+            # - "/etc/mysql/my.cnf" to set global options,
+            # - "~/.my.cnf" to set user-specific options.
+            #
+            # One can use all long options that the program supports.
+            # Run program with --help to get a list of available options and with
+            # --print-defaults to see which it would actually understand and use.
+            #
+            # For explanations see
+            # http://dev.mysql.com/doc/mysql/en/server-system-variables.html
+
+            # This will be passed to all mysql clients
+            # It has been reported that passwords should be enclosed with ticks/quotes
+            # escpecially if they contain "#" chars...
+            # Remember to edit /etc/mysql/debian.cnf when changing the socket location.
+            [client]
+            port		= 3306
+            socket		= /var/run/mysqld/mysqld.sock
+
+            # Here is entries for some specific programs
+            # The following values assume you have at least 32M ram
+
+            # This was formally known as [safe_mysqld]. Both versions are currently parsed.
+            [mysqld_safe]
+            socket		= /var/run/mysqld/mysqld.sock
+            nice		= 0
+
+            [mysqld]
+            #
+            # * Basic Settings
+            #
+            user		= mysql
+            pid-file	= /var/run/mysqld/mysqld.pid
+            socket		= /var/run/mysqld/mysqld.sock
+            port		= 3306
+            basedir		= /usr
+            datadir		= /var/lib/mysql
+            tmpdir		= /tmp
+            lc-messages-dir	= /usr/share/mysql
+            skip-external-locking
+            #
+            # Instead of skip-networking the default is now to listen only on
+            # localhost which is more compatible and is not less secure.
+            #bind-address		= 127.0.0.1
+            #
+            # * Fine Tuning
+            #
+            key_buffer		= 16M
+            max_allowed_packet	= 16M
+            thread_stack		= 192K
+            thread_cache_size       = 8
+            # This replaces the startup script and checks MyISAM tables if needed
+            # the first time they are touched
+            myisam-recover         = BACKUP
+            #max_connections        = 100
+            #table_cache            = 64
+            #thread_concurrency     = 10
+            #
+            # * Query Cache Configuration
+            #
+            query_cache_limit	= 1M
+            query_cache_size        = 16M
+            #
+            # * Logging and Replication
+            #
+            # Both location gets rotated by the cronjob.
+            # Be aware that this log type is a performance killer.
+            # As of 5.1 you can enable the log at runtime!
+            #general_log_file        = /var/log/mysql/mysql.log
+            #general_log             = 1
+            #
+            # Error log - should be very few entries.
+            #
+            log_error = /var/log/mysql/error.log
+            #
+            # Here you can see queries with especially long duration
+            #log_slow_queries	= /var/log/mysql/mysql-slow.log
+            #long_query_time = 2
+            #log-queries-not-using-indexes
+            #
+            # The following can be used as easy to replay backup logs or for replication.
+            # note: if you are setting up a replication slave, see README.Debian about
+            #       other settings you may need to change.
+            #server-id		= 1
+            #log_bin			= /var/log/mysql/mysql-bin.log
+            expire_logs_days	= 10
+            max_binlog_size         = 100M
+            #binlog_do_db		= include_database_name
+            #binlog_ignore_db	= include_database_name
+            #
+            # * InnoDB
+            #
+            # InnoDB is enabled by default with a 10MB datafile in /var/lib/mysql/.
+            # Read the manual for more InnoDB related options. There are many!
+            #
+            # * Security Features
+            #
+            # Read the manual, too, if you want chroot!
+            # chroot = /var/lib/mysql/
+            #
+            # For generating SSL certificates I recommend the OpenSSL GUI "tinyca".
+            #
+            # ssl-ca=/etc/mysql/cacert.pem
+            # ssl-cert=/etc/mysql/server-cert.pem
+            # ssl-key=/etc/mysql/server-key.pem
+
+
+
+            [mysqldump]
+            quick
+            quote-names
+            max_allowed_packet	= 16M
+
+            [mysql]
+            #no-auto-rehash	# faster start of mysql but no tab completition
+
+            [isamchk]
+            key_buffer		= 16M
+
+            #
+            # * IMPORTANT: Additional settings that can override those from this file!
+            #   The files must end with '.cnf', otherwise they'll be ignored.
+            #
+            !includedir /etc/mysql/conf.d/
+
+            """ > /etc/mysql/my.cnf
+
+            echo """
+            [mysqld]
+            # Path to Galera library
+            wsrep_provider=/usr/lib/libgalera_smm.so
+
+            # Cluster connection URL contains the IPs of node#1, node#2 and node#3
+            wsrep_cluster_address=gcomm://__percona1_ip__,__percona2_ip__,__percona3_ip__
+
+
+            # In order for Galera to work correctly binlog format should be ROW
+            binlog_format=ROW
+
+            # MyISAM storage engine has only experimental support
+            default_storage_engine=InnoDB
+
+            # This changes how InnoDB autoincrement locks are managed and is a requirement for Galera
+            innodb_autoinc_lock_mode=2
+
+            # Node #1 address
+            wsrep_node_address=__percona2_ip__
+
+            # SST method
+            wsrep_sst_method=rsync
+
+            # Cluster name
+            wsrep_cluster_name=my_ubuntu_cluster
+
+            # Authentication for SST method
+            #wsrep_sst_auth="sstuser:s3cretPass"
+            """ > /etc/mysql/conf.d/wsrep.cnf
+
+            service mysql start
+
+
+
+  percona3_server:
+    type: OS::Nova::Server
+    properties:
+      name: percona3_server
+      key_name: { get_param: key_name }
+      image: { get_param: image_id }
+      flavor: { get_param: instance_flavor }
+      networks:
+        - port: { get_resource: percona3_server_port }
+      availability_zone: { get_param: availability_zone_server3 }
+      user_data_format: RAW
+      user_data:
+        str_replace:
+          params:
+            __percona1_ip__: { get_attr: [percona1_server_port, fixed_ips, 0, ip_address] }
+            __percona2_ip__: { get_attr: [percona2_server_port, fixed_ips, 0, ip_address] }
+            __percona3_ip__: { get_attr: [percona3_server_port, fixed_ips, 0, ip_address] }
+            __nfs_server_ip__: { get_param: nfs_server_ip }
+          template: |
+            #!/bin/bash
+            # Configure /etc/hosts
+            # This is not necesary in OpenStack Mitaka release
+            echo """
+            __nfs_server_ip__        nfs
+            """ >> /etc/hosts
+
+            export DEBIAN_FRONTEND=noninteractive
+            apt-get update
+            apt-get -y install percona-xtradb-cluster-server
+
+            service mysql stop
+
+            echo """
+            #
+            # The MySQL database server configuration file.
+            #
+            # You can copy this to one of:
+            # - "/etc/mysql/my.cnf" to set global options,
+            # - "~/.my.cnf" to set user-specific options.
+            #
+            # One can use all long options that the program supports.
+            # Run program with --help to get a list of available options and with
+            # --print-defaults to see which it would actually understand and use.
+            #
+            # For explanations see
+            # http://dev.mysql.com/doc/mysql/en/server-system-variables.html
+
+            # This will be passed to all mysql clients
+            # It has been reported that passwords should be enclosed with ticks/quotes
+            # escpecially if they contain "#" chars...
+            # Remember to edit /etc/mysql/debian.cnf when changing the socket location.
+            [client]
+            port		= 3306
+            socket		= /var/run/mysqld/mysqld.sock
+
+            # Here is entries for some specific programs
+            # The following values assume you have at least 32M ram
+
+            # This was formally known as [safe_mysqld]. Both versions are currently parsed.
+            [mysqld_safe]
+            socket		= /var/run/mysqld/mysqld.sock
+            nice		= 0
+
+            [mysqld]
+            #
+            # * Basic Settings
+            #
+            user		= mysql
+            pid-file	= /var/run/mysqld/mysqld.pid
+            socket		= /var/run/mysqld/mysqld.sock
+            port		= 3306
+            basedir		= /usr
+            datadir		= /var/lib/mysql
+            tmpdir		= /tmp
+            lc-messages-dir	= /usr/share/mysql
+            skip-external-locking
+            #
+            # Instead of skip-networking the default is now to listen only on
+            # localhost which is more compatible and is not less secure.
+            #bind-address		= 127.0.0.1
+            #
+            # * Fine Tuning
+            #
+            key_buffer		= 16M
+            max_allowed_packet	= 16M
+            thread_stack		= 192K
+            thread_cache_size       = 8
+            # This replaces the startup script and checks MyISAM tables if needed
+            # the first time they are touched
+            myisam-recover         = BACKUP
+            #max_connections        = 100
+            #table_cache            = 64
+            #thread_concurrency     = 10
+            #
+            # * Query Cache Configuration
+            #
+            query_cache_limit	= 1M
+            query_cache_size        = 16M
+            #
+            # * Logging and Replication
+            #
+            # Both location gets rotated by the cronjob.
+            # Be aware that this log type is a performance killer.
+            # As of 5.1 you can enable the log at runtime!
+            #general_log_file        = /var/log/mysql/mysql.log
+            #general_log             = 1
+            #
+            # Error log - should be very few entries.
+            #
+            log_error = /var/log/mysql/error.log
+            #
+            # Here you can see queries with especially long duration
+            #log_slow_queries	= /var/log/mysql/mysql-slow.log
+            #long_query_time = 2
+            #log-queries-not-using-indexes
+            #
+            # The following can be used as easy to replay backup logs or for replication.
+            # note: if you are setting up a replication slave, see README.Debian about
+            #       other settings you may need to change.
+            #server-id		= 1
+            #log_bin			= /var/log/mysql/mysql-bin.log
+            expire_logs_days	= 10
+            max_binlog_size         = 100M
+            #binlog_do_db		= include_database_name
+            #binlog_ignore_db	= include_database_name
+            #
+            # * InnoDB
+            #
+            # InnoDB is enabled by default with a 10MB datafile in /var/lib/mysql/.
+            # Read the manual for more InnoDB related options. There are many!
+            #
+            # * Security Features
+            #
+            # Read the manual, too, if you want chroot!
+            # chroot = /var/lib/mysql/
+            #
+            # For generating SSL certificates I recommend the OpenSSL GUI "tinyca".
+            #
+            # ssl-ca=/etc/mysql/cacert.pem
+            # ssl-cert=/etc/mysql/server-cert.pem
+            # ssl-key=/etc/mysql/server-key.pem
+
+
+
+            [mysqldump]
+            quick
+            quote-names
+            max_allowed_packet	= 16M
+
+            [mysql]
+            #no-auto-rehash	# faster start of mysql but no tab completition
+
+            [isamchk]
+            key_buffer		= 16M
+
+            #
+            # * IMPORTANT: Additional settings that can override those from this file!
+            #   The files must end with '.cnf', otherwise they'll be ignored.
+            #
+            !includedir /etc/mysql/conf.d/
+
+            """ > /etc/mysql/my.cnf
+
+            echo """
+            [mysqld]
+            # Path to Galera library
+            wsrep_provider=/usr/lib/libgalera_smm.so
+
+            # Cluster connection URL contains the IPs of node#1, node#2 and node#3
+            wsrep_cluster_address=gcomm://__percona1_ip__,__percona2_ip__,__percona3_ip__
+
+
+            # In order for Galera to work correctly binlog format should be ROW
+            binlog_format=ROW
+
+            # MyISAM storage engine has only experimental support
+            default_storage_engine=InnoDB
+
+            # This changes how InnoDB autoincrement locks are managed and is a requirement for Galera
+            innodb_autoinc_lock_mode=2
+
+            # Node #1 address
+            wsrep_node_address=__percona3_ip__
+
+            # SST method
+            wsrep_sst_method=rsync
+
+            # Cluster name
+            wsrep_cluster_name=my_ubuntu_cluster
+
+            # Authentication for SST method
+            #wsrep_sst_auth="sstuser:s3cretPass"
+            """ > /etc/mysql/conf.d/wsrep.cnf
+
+            service mysql start
+
+
+#------------------------------------#
+# Percona Load Balancer properties #
+#------------------------------------#
+  percona_monitor:
+    type: OS::Neutron::HealthMonitor
+    properties:
+      type: TCP
+      delay: 15
+      max_retries: 5
+      timeout: 10
+
+  percona_pool:
+    type: OS::Neutron::Pool
+    properties:
+      name: percona_lb_pool
+      protocol: TCP
+      subnet_id: { get_param: private_subnet_id }
+      lb_method: ROUND_ROBIN
+      monitors: [ { get_resource: percona_monitor } ]
+      vip:
+        name: front_vip
+        description: Front-end virtual IP (VIP)
+        protocol_port: 3306
+#        session_persistence:
+#          type: SOURCE_IP
+
+  percona_lb:
+    type: OS::Neutron::LoadBalancer
+    properties:
+      members: [ { get_resource: percona1_server },{ get_resource: percona2_server },{ get_resource: percona3_server } ]
+      pool_id: { get_resource: percona_pool }
+      protocol_port: 3306
+
+  percona_lb_pool_vip:
+    type: OS::Neutron::FloatingIPAssociation
+    properties:
+      floatingip_id: { get_resource: percona_lb_vip_floating_ip }
+#      port_id: { 'Fn::Select': ['port_id', {get_attr: [pool, vip] } ] }
+      port_id: { get_attr: [ percona_pool, vip, port_id ] }

@@ -1,0 +1,105 @@
+heat_template_version: 2016-04-08
+
+description: Despliegue de un servidor de NFS para drupal
+
+parameters:
+  key_name:
+    type: string
+    label: Key Name
+    description: Name of key-pair to be used for all compute instances
+    constraints:
+      - custom_constraint: nova.keypair
+  image_id:
+    type: string
+    label: Image ID
+    description: Debian 8 Image to be used
+    default: 2873cf16-9fe7-4e55-9e01-9293b3194145
+    constraints:
+      - custom_constraint: glance.image
+  instance_flavor:
+    type: string
+    label: Instance Flavor
+    description: Flavor to be used
+    default: 2
+    constraints:
+      - custom_constraint: nova.flavor
+  public_net_id:
+    type: string
+    label: Public network
+    description: Public network
+    default: 0e2ff1c5-fc78-4dd8-9c6d-5989794e9e71
+  private_net_id:
+    type: string
+    label: Private network
+    description: Private network
+    default: b59e8215-e15c-4fdb-ae7a-475d2780e797
+  availability_zone:
+    type: string
+    label: Availability Zone
+    description: Availability Zone
+    default: zone3
+    constraints:
+      - allowed_values:
+        - zone1
+        - zone2
+        - zone3
+
+resources:
+  # Security group that allows all from all
+  nfs_security_group:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      name: nfs_security_group
+      rules:
+        - remote_ip_prefix: 0.0.0.0/0
+          protocol: tcp
+        - remote_ip_prefix: 0.0.0.0/0
+          protocol: icmp
+
+
+  # create server ports (ip addresses)
+  # needed to configure ansible inventory and /etc/hosts
+  nfs_server_port:
+    type: OS::Neutron::Port
+    properties:
+       network: { get_param: private_net_id }
+       security_groups:
+         - { get_resource: nfs_security_group }
+
+
+  # nfs_server
+  nfs_server_public:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network_id: { get_param: public_net_id }
+      port_id: { get_resource: nfs_server_port }
+
+  nfs_server:
+    type: OS::Nova::Server
+    properties:
+      name: nfs_server
+      key_name: { get_param: key_name }
+      image: { get_param: image_id }
+      flavor: { get_param: instance_flavor }
+      networks:
+        - port: { get_resource: nfs_server_port }
+      availability_zone: { get_param: availability_zone }
+      user_data_format: RAW
+      user_data: |
+          #!/bin/bash
+          apt-get update
+          apt-get install nfs-kernel-server
+
+          mkdir /var/lib/exports
+
+          mkdir /var/lib/exports/configconfig
+          chmod 777 /var/lib/exports/configconfig
+
+          mkdir /var/lib/exports/database
+          chmod 777 /var/lib/exports/database
+
+          echo """
+          /var/lib/exports    192.168.0.0/255.255.0.0(rw,sync,no_root_squash,no_all_squash)
+          """ > /etc/exports
+
+          systemctl restart nfs-kernel-server
