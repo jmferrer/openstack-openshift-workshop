@@ -7,6 +7,7 @@ parameters:
     type: string
     label: Key Name
     description: Name of key-pair to be used for all compute instances
+    default: sistemas
     constraints:
       - custom_constraint: nova.keypair
   image_id:
@@ -87,19 +88,25 @@ resources:
       user_data_format: RAW
       user_data: |
           #!/bin/bash
+          export DEBIAN_FRONTEND=noninteractive
           apt-get update
-          apt-get install nfs-kernel-server
+          apt-get -y install nfs-kernel-server
 
           mkdir /var/lib/exports
 
-          mkdir /var/lib/exports/configconfig
-          chmod 777 /var/lib/exports/configconfig
-
-          mkdir /var/lib/exports/database
-          chmod 777 /var/lib/exports/database
+          mkdir /var/lib/exports/drupal
+          chmod 777 /var/lib/exports/drupal
 
           echo """
           /var/lib/exports    192.168.0.0/255.255.0.0(rw,sync,no_root_squash,no_all_squash)
           """ > /etc/exports
 
           systemctl restart nfs-kernel-server
+
+  nfs_record:
+    type: OS::Designate::Record
+    properties:
+      name: nfs.jmferrer.os.paradigmadigital.com.
+      type: A
+      domain: jmferrer.os.paradigmadigital.com.
+      data: { get_attr: [nfs_server_public, floating_ip_address] }

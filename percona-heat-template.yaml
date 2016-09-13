@@ -9,6 +9,7 @@ parameters:
     description: Name of key-pair to be used for all compute instances
     constraints:
       - custom_constraint: nova.keypair
+    default: sistemas
   image_id:
     type: string
     label: Image ID
@@ -762,3 +763,12 @@ resources:
       floatingip_id: { get_resource: percona_lb_vip_floating_ip }
 #      port_id: { 'Fn::Select': ['port_id', {get_attr: [pool, vip] } ] }
       port_id: { get_attr: [ percona_pool, vip, port_id ] }
+
+
+  percona_record:
+    type: OS::Designate::Record
+    properties:
+      name: percona.jmferrer.os.paradigmadigital.com.
+      type: A
+      domain: jmferrer.os.paradigmadigital.com.
+      data: { get_attr: [percona_lb_vip_floating_ip, floating_ip_address] }

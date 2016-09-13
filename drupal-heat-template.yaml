@@ -1,0 +1,378 @@
+heat_template_version: 2016-04-08
+
+description: Despliegue de un cluster de Drupal
+
+parameters:
+  key_name:
+    type: string
+    label: Key Name
+    description: Name of key-pair to be used for all compute instances
+    constraints:
+      - custom_constraint: nova.keypair
+    default: sistemas
+  image_id:
+    type: string
+    label: Image ID
+    description: Debian 8 Image to be used
+    default: 2873cf16-9fe7-4e55-9e01-9293b3194145
+    constraints:
+      - custom_constraint: glance.image
+  instance_flavor:
+    type: string
+    label: Flavor
+    description: Flavor
+    default: 2
+    constraints:
+      - custom_constraint: nova.flavor
+  public_net_id:
+    type: string
+    label: Public network
+    description: Public network
+    default: 0e2ff1c5-fc78-4dd8-9c6d-5989794e9e71
+  private_net_id:
+    type: string
+    label: Private network
+    description: Private network
+    default: b59e8215-e15c-4fdb-ae7a-475d2780e797
+  private_subnet_id:
+    type: string
+    label: Private Subnet
+    description: Private Subnet
+    default: 96ad9deb-c13c-45b4-8cab-d25bd65b6b50
+  availability_zone_drupal_1:
+    type: string
+    label: Availability Zone Drupal 1
+    description: Availability Zone Drupal 1
+    default: zone3
+    constraints:
+      - allowed_values:
+        - zone1
+        - zone2
+        - zone3
+  availability_zone_drupal_2:
+    type: string
+    label: Availability Zone Drupal 2
+    description: Availability Zone Drupal 2
+    default: zone1
+    constraints:
+      - allowed_values:
+        - zone1
+        - zone2
+        - zone3
+  availability_zone_drupal_3:
+    type: string
+    label: Availability Zone Drupal 3
+    description: Availability Zone Drupal 3
+    default: zone2
+    constraints:
+      - allowed_values:
+        - zone1
+        - zone2
+        - zone3
+  nfs_service_ip:
+    type: string
+    label: NFS Service IP
+    description: NFS Service IP
+    default: nfs.jmferrer.os.paradigmadigital.com
+  percona_service_ip:
+    type: string
+    label: Percona Service IP
+    description: Percona Service IP
+    default: percona.jmferrer.os.paradigmadigital.com
+  git_repository:
+    type: string
+    label: Git Repository
+    description: Git Repository
+    default: https://github.com/jmferrer/openstack-openshift-workshop
+  git_branch:
+    type: string
+    label: Git Branch
+    description: Git Branch
+    default: master
+  source_directory:
+    type: string
+    label: Source Code Directory
+    description: Source Code Directory
+    default: drupal-7.44
+  site_name:
+    type: string
+    label: Site Name
+    description: Site Name
+    default: drupal.jmferrer.os.paradigmadigital.com.
+
+
+resources:
+  # Security group that allows all from all
+  drupal_security_group:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      name: percona_security_group
+      rules:
+        - remote_ip_prefix: 0.0.0.0/0
+          protocol: tcp
+        - remote_ip_prefix: 0.0.0.0/0
+          protocol: icmp
+
+
+  # create server ports (ip addresses)
+  # needed to configure ansible inventory and /etc/hosts
+  drupal1_server_port:
+    type: OS::Neutron::Port
+    properties:
+       network: { get_param: private_net_id }
+       security_groups:
+         - { get_resource: drupal_security_group }
+
+  drupal2_server_port:
+    type: OS::Neutron::Port
+    properties:
+       network: { get_param: private_net_id }
+       security_groups:
+         - { get_resource: drupal_security_group }
+
+  drupal3_server_port:
+    type: OS::Neutron::Port
+    properties:
+       network: { get_param: private_net_id }
+       security_groups:
+         - { get_resource: drupal_security_group }
+
+
+  drupal_lb_vip_port:
+    type: OS::Neutron::Port
+    properties:
+      security_groups: [{ get_resource: drupal_security_group }]
+      network: { get_param: private_net_id }
+
+  drupal_lb_vip_floating_ip:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network_id: { get_param: public_net_id  }
+      port_id: { get_resource: drupal_lb_vip_port }
+
+
+  drupal1_server:
+    type: OS::Nova::Server
+    properties:
+      name: drupal-1
+      key_name: { get_param: key_name }
+      image: { get_param: image_id }
+      flavor: { get_param: instance_flavor }
+      networks:
+        - port: { get_resource: drupal1_server_port }
+      availability_zone: { get_param: availability_zone_drupal_1 }
+      user_data_format: RAW
+      user_data:
+        str_replace:
+          params:
+            __git_repository__: { get_param: git_repository }
+            __git_branch__: { get_param: git_branch }
+            __source_directory__: { get_param: source_directory }
+            __nfs_service_ip__: { get_param: nfs_service_ip }
+            __percona_service_ip__: { get_param: percona_service_ip }
+            __site_name__: { get_param: site_name }
+          template: |
+            #!/bin/bash
+            # Configure /etc/hosts
+
+            export DEBIAN_FRONTEND=noninteractive
+            apt-get update
+            apt-get -y install git apache2 apache2-utils libapache2-mod-php5 libapr1 libxpm4 mysql-client php5 php5-cli php5-gd php5-json php5-mysql php5-readline
+            systemctl restart apache2
+
+            echo "create database drupal" | mysql -u root -h __percona_service_ip__
+            echo "grant all privileges on drupal.* to 'drupal'@'%' identified by 'drupal' with grant option;" | mysql -u root -h __percona_service_ip__
+
+            git clone __git_repository__ /tmp/code
+            git -C /tmp/code checkout __git_branch__
+            rsync -av --delete-before /tmp/code/__source_directory__/ /var/www/html/
+
+            apt-get -y install nfs-common rpcbind
+            echo "__nfs_service_ip__:/var/lib/exports/drupal  /var/www/html/sites/default  nfs4  defaults 0 2" >> /etc/fstab
+
+            mount /var/www/html/sites/default
+
+            echo """
+            <?php
+
+            \$databases = array (
+              'default' =>
+              array (
+                'default' =>
+                array (
+                  'database' => 'drupal',
+                  'username' => 'drupal',
+                  'password' => 'drupal',
+                  'host' => '__percona_service_ip__',
+                  'port' => '',
+                  'driver' => 'mysql',
+                  'prefix' => '',
+                ),
+              ),
+            );
+
+            \$update_free_access = FALSE;
+            \$drupal_hash_salt = 'ZHfwiIFgnutzLi7b8fy9fbRwOIqKYZuG8EMxfE6nhK4';
+
+            ini_set('session.gc_probability', 1);
+            ini_set('session.gc_divisor', 100);
+            ini_set('session.gc_maxlifetime', 200000);
+            ini_set('session.cookie_lifetime', 2000000);
+            \$conf['404_fast_paths_exclude'] = '/\/(?:styles)|(?:system\/files)\//';
+            \$conf['404_fast_paths'] = '/\.(?:txt|png|gif|jpe?g|css|js|ico|swf|flv|cgi|bat|pl|dll|exe|asp)$/i';
+            \$conf['404_fast_html'] = '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML+RDFa 1.0//EN" "http://www.w3.org/MarkUp/DTD/xhtml-rdfa-1.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><title>404 Not Found</title></head><body><h1>Not Found</h1><p>The requested URL "@path" was not found on this server.</p></body></html>';
+            """ > /var/www/html/sites/default/settings.php
+            chmod 444 /var/www/html/sites/default/settings.php
+
+            mkdir -p /var/www/html/sites/default/files/styles
+
+            echo """
+            # Turn off all options we don't need.
+            Options None
+            Options +FollowSymLinks
+
+            # Set the catch-all handler to prevent scripts from being executed.
+            SetHandler Drupal_Security_Do_Not_Remove_See_SA_2006_006
+            <Files *>
+              # Override the handler again if we're run later in the evaluation list.
+              SetHandler Drupal_Security_Do_Not_Remove_See_SA_2013_003
+            </Files>
+
+            # If we know how to do it safely, disable the PHP engine entirely.
+            <IfModule mod_php5.c>
+              php_flag engine off
+            </IfModule>
+            """ > /var/www/html/sites/default/files/.htaccess
+            chmod 444 /var/www/html/sites/default/files/.htaccess
+
+            chown -R www-data:www-data /var/www/html/sites/default/
+
+
+
+  drupal2_server:
+    type: OS::Nova::Server
+    properties:
+      name: drupal-2
+      key_name: { get_param: key_name }
+      image: { get_param: image_id }
+      flavor: { get_param: instance_flavor }
+      networks:
+        - port: { get_resource: drupal2_server_port }
+      availability_zone: { get_param: availability_zone_drupal_2 }
+      user_data_format: RAW
+      user_data:
+        str_replace:
+          params:
+            __git_repository__: { get_param: git_repository }
+            __git_branch__: { get_param: git_branch }
+            __source_directory__: { get_param: source_directory }
+            __nfs_service_ip__: { get_param: nfs_service_ip }
+            __percona_service_ip__: { get_param: nfs_service_ip }
+            __site_name__: { get_param: site_name }
+          template: |
+            #!/bin/bash
+            # Configure /etc/hosts
+
+            export DEBIAN_FRONTEND=noninteractive
+            apt-get update
+            apt-get -y install git apache2 apache2-utils libapache2-mod-php5 libapr1 libxpm4 mysql-client php5 php5-cli php5-gd php5-json php5-mysql php5-readline
+            systemctl restart apache2
+
+            git clone __git_repository__ /tmp/code
+            git -C /tmp/code checkout __git_branch__
+            rsync -av --delete-before /tmp/code/__source_directory__/ /var/www/html/
+
+            apt-get -y install nfs-common rpcbind
+            echo "__nfs_service_ip__:/var/lib/exports/drupal  /var/www/html/sites/default  nfs4  defaults 0 2" >> /etc/fstab
+
+            mount /var/www/html/sites/default
+
+
+
+  drupal3_server:
+    type: OS::Nova::Server
+    properties:
+      name: drupal-3
+      key_name: { get_param: key_name }
+      image: { get_param: image_id }
+      flavor: { get_param: instance_flavor }
+      networks:
+        - port: { get_resource: drupal3_server_port }
+      availability_zone: { get_param: availability_zone_drupal_3 }
+      user_data_format: RAW
+      user_data:
+        str_replace:
+          params:
+            __git_repository__: { get_param: git_repository }
+            __git_branch__: { get_param: git_branch }
+            __source_directory__: { get_param: source_directory }
+            __nfs_service_ip__: { get_param: nfs_service_ip }
+            __percona_service_ip__: { get_param: nfs_service_ip }
+            __site_name__: { get_param: site_name }
+          template: |
+            #!/bin/bash
+            # Configure /etc/hosts
+
+            export DEBIAN_FRONTEND=noninteractive
+            apt-get update
+            apt-get -y install git apache2 apache2-utils libapache2-mod-php5 libapr1 libxpm4 mysql-client php5 php5-cli php5-gd php5-json php5-mysql php5-readline
+            systemctl restart apache2
+
+            git clone __git_repository__ /tmp/code
+            git -C /tmp/code checkout __git_branch__
+            rsync -av --delete-before /tmp/code/__source_directory__/ /var/www/html/
+
+            apt-get -y install nfs-common rpcbind
+            echo "__nfs_service_ip__:/var/lib/exports/drupal  /var/www/html/sites/default  nfs4  defaults 0 2" >> /etc/fstab
+
+            mount /var/www/html/sites/default
+
+
+#------------------------------------#
+# Percona Load Balancer properties #
+#------------------------------------#
+  drupal_monitor:
+    type: OS::Neutron::HealthMonitor
+    properties:
+      type: TCP
+      delay: 15
+      max_retries: 5
+      timeout: 10
+
+  drupal_pool:
+    type: OS::Neutron::Pool
+    properties:
+      name: drupal_lb_pool
+      protocol: TCP
+      subnet_id: { get_param: private_subnet_id }
+      lb_method: ROUND_ROBIN
+      monitors: [ { get_resource: drupal_monitor } ]
+      vip:
+        name: front_vip
+        description: Front-end virtual IP (VIP)
+        protocol_port: 80
+#        session_persistence:
+#          type: SOURCE_IP
+
+  drupal_lb:
+    type: OS::Neutron::LoadBalancer
+    properties:
+      members: [ { get_resource: drupal1_server },{ get_resource: drupal2_server },{ get_resource: drupal3_server } ]
+      pool_id: { get_resource: drupal_pool }
+      protocol_port: 80
+
+  drupal_lb_pool_vip:
+    type: OS::Neutron::FloatingIPAssociation
+    properties:
+      floatingip_id: { get_resource: drupal_lb_vip_floating_ip }
+#      port_id: { 'Fn::Select': ['port_id', {get_attr: [pool, vip] } ] }
+      port_id: { get_attr: [ drupal_pool, vip, port_id ] }
+
+
+  drupal_record:
+    type: OS::Designate::Record
+    properties:
+      name: { get_param: site_name }
+      type: A
+      domain: jmferrer.os.paradigmadigital.com.
+      data: { get_attr: [drupal_lb_vip_floating_ip, floating_ip_address] }
