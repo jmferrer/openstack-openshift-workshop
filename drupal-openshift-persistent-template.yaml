@@ -1,0 +1,219 @@
+{
+  "kind": "Template",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "drupal-persistent",
+    "creationTimestamp": null,
+    "annotations": {
+      "description": "Drupal service, with persistent storage.\nYou must have persistent volumes available in your cluster to use this template.",
+      "tags": "instant-app,drupal"
+    }
+  },
+  "labels": {
+    "template": "drupal-persistent-template"
+  },
+  "parameters": [
+    {
+      "name": "DRUPAL_SERVICE_NAME",
+      "displayName": "Drupal Service Name",
+      "description": "The name of the OpenShift Service exposed for the Drupal container.",
+      "value": "drupal"
+    },
+    {
+      "name": "DRUPAL_HOSTNAME",
+      "displayName": "Drupal instance hostname",
+      "description": "Custom hostname for service routes. Default works for the OpenShift all-in-one VM, e.g.: <application-name>.<project>.<default-domain-suffix>",
+      "value": "drupal.apps.10.2.2.2.xip.io"
+    },
+    {
+      "name": "MEMORY_LIMIT",
+      "displayName": "Memory Limit",
+      "description": "Maximum amount of memory the container can use.",
+      "value": "2048Mi"
+    },
+    {
+      "name": "VOLUME_CAPACITY",
+      "displayName": "Volume Capacity",
+      "description": "Volume space available for data, e.g. 512Mi, 2Gi.",
+      "value": "10Gi",
+      "required": true
+    }
+  ],
+  "objects": [
+    {
+      "kind": "Route",
+      "apiVersion": "v1",
+      "metadata": {
+        "name": "${DRUPAL_SERVICE_NAME}",
+        "creationTimestamp": null
+      },
+      "spec": {
+        "host": "${DRUPAL_HOSTNAME}",
+        "to": {
+          "kind": "Service",
+          "name": "${DRUPAL_SERVICE_NAME}"
+        },
+        "tls": {
+          "termination": "edge"
+        }
+      }
+    },
+    {
+      "kind": "PersistentVolumeClaim",
+      "apiVersion": "v1",
+      "metadata": {
+        "name": "${DRUPAL_SERVICE_NAME}"
+      },
+      "spec": {
+        "accessModes": [
+          "ReadWriteOnce"
+        ],
+        "resources": {
+          "requests": {
+            "storage": "${VOLUME_CAPACITY}"
+          }
+        }
+      }
+    },
+    {
+      "kind": "ImageStream",
+      "apiVersion": "v1",
+      "metadata": {
+        "name": "${DRUPAL_SERVICE_NAME}",
+        "labels": {
+          "app": "${DRUPAL_SERVICE_NAME}"
+        }
+      },
+      "spec": {
+        "tags": [
+          {
+            "name": "7.44",
+            "from": {
+              "kind": "DockerImage",
+              "name": "drupal:7.44"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "kind": "DeploymentConfig",
+      "apiVersion": "v1",
+      "metadata": {
+        "name": "${DRUPAL_SERVICE_NAME}",
+        "creationTimestamp": null
+      },
+      "spec": {
+        "strategy": {
+          "type": "Recreate"
+        },
+        "triggers": [
+          {
+            "type": "ImageChange",
+            "imageChangeParams": {
+              "automatic": true,
+              "containerNames": [
+                "drupal"
+              ],
+              "from": {
+                "kind": "ImageStreamTag",
+                "name": "${DRUPAL_SERVICE_NAME}:7.44"
+              },
+              "lastTriggeredImage": ""
+            }
+          },
+          {
+            "type": "ConfigChange"
+          }
+        ],
+        "replicas": 1,
+        "selector": {
+          "name": "${DRUPAL_SERVICE_NAME}"
+        },
+        "template": {
+          "metadata": {
+            "creationTimestamp": null,
+            "labels": {
+              "name": "${DRUPAL_SERVICE_NAME}"
+            }
+          },
+          "spec": {
+            "containers": [
+              {
+                "name": "drupal",
+                "image": "drupal",
+                "readinessProbe": {
+                  "timeoutSeconds": 3,
+                  "initialDelaySeconds": 3,
+                  "httpGet": {
+                    "port": 80
+                  }
+                },
+                "livenessProbe": {
+                    "timeoutSeconds": 3,
+                    "initialDelaySeconds": 60,
+                    "httpGet": {
+                        "port": 80
+                    }
+                },
+                "resources": {
+                  "limits": {
+                    "memory": "${MEMORY_LIMIT}"
+                  }
+                },
+                "volumeMounts": [
+                  {
+                    "name": "${DRUPAL_SERVICE_NAME}",
+                    "mountPath": "/var/www/html/sites/default"
+                  }
+                ],
+                "terminationMessagePath": "/dev/termination-log",
+                "imagePullPolicy": "IfNotPresent",
+                "capabilities": {},
+                "securityContext": {
+                  "capabilities": {},
+                  "privileged": false
+                }
+              }
+            ],
+            "volumes": [
+              {
+                "name": "${DRUPAL_SERVICE_NAME}",
+                "persistentVolumeClaim": {
+                  "claimName": "${DRUPAL_SERVICE_NAME}"
+                }
+              }
+            ],
+            "restartPolicy": "Always",
+            "dnsPolicy": "ClusterFirst"
+          }
+        }
+      }
+    },
+    {
+      "kind": "Service",
+      "apiVersion": "v1",
+      "metadata": {
+        "name": "${DRUPAL_SERVICE_NAME}",
+        "creationTimestamp": null
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "web",
+            "protocol": "TCP",
+            "port": 80,
+            "targetPort": 80,
+            "nodePort": 0
+          }
+        ],
+        "selector": {
+          "name": "${DRUPAL_SERVICE_NAME}"
+        },
+        "portalIP": "",
+        "type": "ClusterIP",
+        "sessionAffinity": "None"
+      }
+    }
+  ]
+}

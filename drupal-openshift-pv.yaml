@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: drupal
+  labels:
+    app: "drupal"
+    volumetype: "data"
+spec:
+  capacity:
+    storage: 10Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  nfs:
+    path: /var/lib/exports/drupal
+    server: nfs.jmferrer.os.paradigmadigital.com
