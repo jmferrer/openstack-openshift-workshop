@@ -155,13 +155,21 @@ Falta gente.
 #### Vacas sagradas
 ##### Desconocimiento
 ¿Porque cambiar un sistema de virtualización por otro si el que tenemos funciona?
-¡No es un sistema de virtualización!
+¡Que no es un sistema de virtualización!
 
 ## OpenShift
 
 ### Posible instalación con Heat
 RedHat trae una plantilla de instalación oficial pero yo me he hecho la mía.
+¡No da tiempo! -> Usaremos un OpenShift ya instalado.
 
 ### Despliegue de aplicación
-### Explicación de arquitectura
+```
+oc create -f drupal-openshift-pv.yaml
+oc new-app -f drupal-openshift-persistent-template.yaml -p DRUPAL_HOSTNAME=drupal.jmferrer.os.paradigmadigital.com
+```
+Cambiar DNS a 192.168.42.174 .
+
+### Explicación de arquitectura de Kubernetes
+
 ### Explicación de la pila
