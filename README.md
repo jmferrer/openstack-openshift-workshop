@@ -7,6 +7,17 @@ Es un producto que te permite exponer tu infraestructura como servicio.
 Por ejemplo, nos permite hacer la misma funcionalidad de cualquier sistema de virtualización. :-D
 
 ### Despliegue
+#### ¿Que queremos?
+Se pretende hacer un despliegue:
+* rápido, sencillo
+* en cualquier tipo de hardware
+* sin importar su ubicación física
+* utilizando un appliance
+
+#### ¿Que necesitamos?
+Necesitamos una sola máquina con una sola tarjeta de red. Esa máquina puede ser desde un servidor dedicado barato ( 30€/mes ) en algún lugar de internet hasta un servidor en el propio CPD.
+
+#### ¿Como lo hacemos?
 Ejecutar ansible de https://github.com/paradigmadigital/ansible-openstack-vcenter con keystone+databases+dashboard .
 
 Instalación desactualizada:
@@ -43,14 +54,14 @@ ansible-playbook -i hosts site.yml
 
 No es mejor en general. Es mejor para mi porque me sirve para crear entornos de desarrollo en cualquier sitio por barato que sea.
 
-[esquema arquitectura]
+[esquema vcenter-network.dia]
 
 ### Alternativas de despliegue
 RedHat: RDO
 Ubuntu: MAAS
-Mirantis
-HP: Helium
 RackSpace: Private Cloud
++Mirantis
+HP: Helium
 Custom:
 * ansible
 * puppet
@@ -58,23 +69,9 @@ Custom:
 * manual
 Otras que no conozco.
 
-¡Cuidado con los impostores!
+¡NO MUERDE!
 
 ### Que es realmente
-#### ¡No es un sistema de virtualización!
-Puede sustituir a nuestro sistema de virtualización pero ¡cambiarlo no tiene porqué ser motivo suficiente para usar OpenStack!
-
-Permite:
-* agilizar nuestro proceso de desarrollo
-* saber cuanto gasta cada proyecto
-* extremadamente síncrono
-* no expuesto a fallos humanos
-* escalable en tiempo y coste razonables
-* abstracción de servicios
-* automatización
-* ...
-* be cloud!
-
 #### Infraestructura como servicio
 Servicios de infraestructura:
 * identidad (keystone) (ejemplo de gestión de ldap)
@@ -95,13 +92,26 @@ Servicios de infraestructura:
 
 ¡Cuidado con los impostores!
 
+#### ¡No es un sistema de virtualización!
+Puede sustituir a nuestro sistema de virtualización pero ¡cambiarlo no tiene porqué ser motivo suficiente para usar OpenStack!
+
+Permite:
+* agilizar nuestro proceso de desarrollo
+* saber cuanto gasta cada proyecto
+* extremadamente síncrono
+* no expuesto a fallos humanos imprevisibles
+* abstracción de servicios
+* automatización
+* ...
+* be cloud!
+
 ### Despliegue
 Esquema de aplicación (drupal):
 * aplicación
 * persistencia
 * base de datos
 
-[esquema]
+[esquema drupal-openstack.dia]
 
 #### Despliegue de infraestructura
 ##### Volúmenes persistentes
@@ -112,18 +122,23 @@ Ejecutamos:
 heat stack-create test --template-file=nfs-server.yaml
 ```
 
+[esquema persistencia-openstack.dia]
+
 ##### Base de datos
 Deberíamos usar trove pero no lo tengo desplegado así que vamos a usar un cluster de Percona con un balanceador tcp al 3306.
 
 Ejecutamos cluster-percona.yaml .
 
+[esquema database-openstack.dia]
+
 #### Despliegue de aplicación
-Tres servidores con Drupal pasando como parámetros cluster Percona, volumen para /etc/drupal, /var/lib/drupal/files y red pública con un balanceador tcp al 80.
+Tres servidores con Drupal pasando como parámetros cluster Percona, volumen para /etc/drupal, /var/www.html/drupal/sites/default y red pública con un balanceador tcp al 80.
 
 Ejecutamos drupal.yaml .
 
-### Si es tan bueno ¿porque nadie lo usa?
+[esquema drupal-app-openstack.dia]
 
+### Si es tan bueno ¿porque nadie lo usa?
 #### Inercia
 ##### Tenemos
 Tenemos unos procedimientos que están adaptados a una infraestructura no cloud.
@@ -149,13 +164,14 @@ Acabo de demostrar que una sola persona con un poco de tiempo puede desarrollar 
 
 Hay multitud de empresas que ofrecen servicios alrededor de OpenStack.
 
-##### Porqué está mal hecho
-Falta gente.
+#### ¡Oportunidades personales!
+Hay mucho trabajo por hacer.
+Trove:
+* mysql
+* mongodb
+* percona
 
-#### Vacas sagradas
-##### Desconocimiento
-¿Porque cambiar un sistema de virtualización por otro si el que tenemos funciona?
-¡Que no es un sistema de virtualización!
+¿Y el resto?
 
 ## OpenShift
 
@@ -170,6 +186,23 @@ oc new-app -f drupal-openshift-persistent-template.yaml -p DRUPAL_HOSTNAME=drupa
 ```
 Cambiar DNS a 192.168.42.174 .
 
-### Explicación de arquitectura de Kubernetes
+### Vacas sagradas
+¿Porque cambiar un sistema de virtualización por otro si el que tenemos funciona?
+¡PORQUE OPENSTACK NO ES UN SISTEMA DE VIRTUALIZACIÓN!
+
+### ¡El mileniarismo va a llegaaaarrrrrr!
+Tecnología disruptiva hace que las personas que no sepan manejarla se queden fuera del mercado laboral.
+
+### OpenShift ¿por donde van las comunicaciones?
+* router
+* service
+* replication controller
+* pod
+* container
 
 ### Explicación de la pila
+* linux
+* contenedores, cgroups, ...
+* docker
+* kubernetes
+* OpenShift

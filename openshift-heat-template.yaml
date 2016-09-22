@@ -1,0 +1,589 @@
+heat_template_version: 2015-04-30
+
+description: Despliegue de la infraestructura de desarrollo de CORPME
+
+parameters:
+  key_name:
+    type: string
+    label: Key Name
+    description: Name of key-pair to be used for all compute instances
+    constraints:
+      - custom_constraint: nova.keypair
+  image_id:
+    type: string
+    label: Image ID
+    description: CentOS 7 Image to be used for all compute instances
+    default: c942a4bf-52a1-4217-b809-fa63d61c5e19
+    constraints:
+      - custom_constraint: glance.image
+  master_instance_type:
+    type: string
+    label: Master Instance Type
+    description: Flavor to be used for OpenShift Master Instances (docker preinstalled)
+    default: 3
+    constraints:
+      - custom_constraint: nova.flavor
+  node_instance_type:
+    type: string
+    label: Node Instance Type
+    description: Flavor to be used for OpenShift Node Instances (needs /dev/vdb and docker preinstalled)
+    default: 13
+    constraints:
+      - custom_constraint: nova.flavor
+  public_net_id:
+    type: string
+    label: Public network
+    description: Public network
+    default: 615ca1d1-2a5e-467d-9f68-4abf3e27295d
+  cidr:
+    type: string
+    label: Network CIDR
+    description: The CIDR of the private network.
+    default: 192.168.1.0/24
+  id_rsa:
+    type: string
+    label: Private RSA key to deploy OpenShift generated with "base64 -w 0 id_rsa"
+    description: Private RSA key to deploy Openshift generated with "base64 -w 0 id_rsa"
+    default: LS0tLS1CRUdJTiBSU0EgUFJJVkFURSBLRVktLS0tLQpNSUlFcGdJQkFBS0NBUUVBc2pZQUMveDdYamtiNmxITTlUdVNzYWFIbHo4c1Y5K2JwVkU1RDNhMmNXYjViZVNQCmQybnovVHRHd25kQlg5UWtJS1B2YmNtOFF0TFZLZ1cyTXFXOE1iVCtzb2JXRkxOdCtYSnNvZkJUWTYrNnI0QkEKUmo1ZXY3M3ZOU0ljaWNvcHRzMWgzQlJMVFRvVmFhUlBpTWJvUWNMaUlacU5YRVh6dzJIdlFldHBhaXFLL2IxbgpGTnpIWHZsK1JZWUpIZERULzVTQlhxSDJSazZ2M2xqc3BGeFhoVjh1a09YQXV1aUVFYkdnajV1VVpDSlBQNGNvCkYweW1XMm45aTcybkIrY0R4dnFteXpWNXJYcER6emNaRGhhdkJ1OFhpdzJhQWxnSDlVNGplNm9FTE5JbG9vOCsKQ0IrR3RtZGNPaWVqd1RTL3RjMHU3QS9Db0E3MnU2YzZwVGZXeXdJREFRQUJBb0lCQVFDc1J3MjJpS2JPaUpEVwo3YXNnYXkyOXRVb2d5WDVabUo0RHE4aG9qWStEZzFPZmk3T3hjZWpmcGYwYW8yUzhlZjFPM0l2cWEzb21jMkNFCmxpN3pPVXI4Rm9lZUdFRStrOUs5c1lNWTdaWC9xWExrbEN3T2U5N21wM3RtdHdvMW5nekRYanE3SVpkR0dkOTMKVjlOWFcwcE53Rk1RdnpMbXYrME50VkF4UHAyU2RkOEIweEpLVys2TXBrblkyb1JKOEROTE12MFhtZ3pyYTdDVgpRN0VaVWx0UTFyYS9wSU5rcnRoUEdyK3pqWVB4VEx5czZ2aG5ZTHdkYm9IcUxGQVRSeE5UbVhveTRRV0VZRjZsCkcraGEwRUFRdUs5VjhCTGg0aWRya1FkMHdkd0pLL0tyTlIxZWc0MHpmdEhtY084UEtyK2J2S3IyWGNEODB4blIKc3dZNHAwL1pBb0dCQU5xSmJXemxOVVo3R1FZL2RlM3NOTUNlUWJrdm1HcUg1VzRERGY3UWs4VVd2c3ZYRW1OQwp1VENELzhNY0NIVzN3OUdZc09sMVcxZk9ZUWZ0TStrYUJORTBRUS8yN3MwN1NQV3AxdnRNNUNXNXdUZmNqWGVhCmg3MjZmRU5acVdhV2YwSjZTWEFHMUt6ZkF0MURZbmZpU24ySzhLd3FvQjA4N0pVU3RraUtGNHYzQW9HQkFOREMKMnd6b3ZCUkc5czdZbTN0NFlvOGlQeDFWNW4raXlVd1JWUXVtM0dXeVRmQytaUWRyNW0xL3lsazcxeElXVTRRdAp5bGJpTTZBUFNRSHV3dnRXZHdmMkE2OUtVUnJyL3lHcTlxdno4RGh4VkJsSW5zQnVKMFBxVFhUM002aW9uYjhVCnc5TU90VGxnUVh4THg1UGUxOVowdVlQcFB4aG5jZ1dERlpSSkpNN05Bb0dCQUtMaTYvek9tdmI5cVpsT2s4ZlMKMXo3NnRtSWhaNmwvd1RKT2RKQUpSeHNQNlFabU4vNWtMVVJNSHNaK2pvK3ZlUFV3cWl4WW5NekZ0dTBCa0QrZQpkUmk1cWdVTU9OSWY3akd0ZGQrNVlCUCtjRllDdmk3M3IxVnJPbE80OE5yV01lU0s0Vkh1eFhaVWd2NEl5OHd2Cmp2WWtLVjhxSmsya3EzSXhrRXhoSVV2aEFvR0JBSU5Vb2xPYnNuNmJLamQwZzFRSXB4QmV2Zy9wYzJtR2NsYWQKYk1BNHg5eGVjTFBzUTBpSTg5eWRFU0pVQi9oRC9XUmhIakxNZVNmUGxlRldZR21YdXFoU2QzejJKdEhsOTRvcApzS2I2Zm53enAzR0Vnd0tTQ2JlckZmRm9kcUk2K1lvMU9RQjA5ME5TTDhCUE9BM3BtaVU3SjE0NkJVeUgvMjVDClNmZ1FqOHhkQW9HQkFKTnFLMkNMbHIwc2lwQWxKNDBzOTkzM2t0NjVWekdhMUhaTmFxa0tNNUVSd2xmVFZLQ2cKVmdmM0NQNXFQeElZb1pWR3FFYUNXUDY2WTV1WHp5bEkya1lGMkRRR2VuV0NSRFo3NUlCTStFUk9jbGFvM3laUApOQmZuSEgxYjlPL3hjTXdtOGgxYWpZR1BiNUFHcDAzT0FhbElXY2grbUJERzBxQ2Z2em9xNk91MwotLS0tLUVORCBSU0EgUFJJVkFURSBLRVktLS0tLQo=
+  id_rsa_pub:
+    type: string
+    label: Public RSA key to deploy OpenShift
+    description: Public RSA key to deploy Openshift
+    default: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCyNgAL/HteORvqUcz1O5KxpoeXPyxX35ulUTkPdrZxZvlt5I93afP9O0bCd0Ff1CQgo+9tybxC0tUqBbYypbwxtP6yhtYUs235cmyh8FNjr7qvgEBGPl6/ve81IhyJyim2zWHcFEtNOhVppE+IxuhBwuIhmo1cRfPDYe9B62lqKor9vWcU3Mde+X5Fhgkd0NP/lIFeofZGTq/eWOykXFeFXy6Q5cC66IQRsaCPm5RkIk8/hygXTKZbaf2LvacH5wPG+qbLNXmtekPPNxkOFq8G7xeLDZoCWAf1TiN7qgQs0iWijz4IH4a2Z1w6J6PBNL+1zS7sD8KgDva7pzqlN9bL
+  openshift_admin__username:
+    type: string
+    label: OpenShift admin username
+    description: OpenShift Admin username
+    default: admin
+  openshift_admin_password:
+    type: string
+    hidden: true
+    label: OpenShift admin password
+    description: OpenShift admin password
+  openshift_ansible_version:
+    type: string
+    label: OpenShift Ansible version
+    description: OpenShit Ansible version (tag in github in master branch)
+    default: openshift-ansible-3.0.87-1
+#  openshift_public_hostname:
+#    type: string
+#    label: OpenShift Public Hostname (https://openshift.yourdomain.com:8443)
+#    description: OpenShift Public Hostname (https://openshift.yourdomain.com:8443)
+#    default: https://bol-openshift.paradigmadigital.com
+
+resources:
+  # Security group that allows all from all
+  public_security_group:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      name: server_security_group
+      rules:
+        - remote_ip_prefix: 0.0.0.0/0
+          protocol: tcp
+        - remote_ip_prefix: 0.0.0.0/0
+          protocol: icmp
+
+  master_security_group:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      name: server_security_group
+      rules:
+        - remote_ip_prefix: 0.0.0.0/0
+          protocol: tcp
+        - remote_ip_prefix: 0.0.0.0/0
+          protocol: icmp
+
+  node_security_group:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      name: server_security_group
+      rules:
+        - remote_ip_prefix: 0.0.0.0/0
+          protocol: tcp
+        - remote_ip_prefix: 0.0.0.0/0
+          protocol: icmp
+
+  # Network infraestructure
+  private_net:
+    type: OS::Neutron::Net
+
+  private_subnet:
+    type: OS::Neutron::Subnet
+    properties:
+      network_id: { get_resource: private_net }
+      cidr: { get_param: cidr }
+      dns_nameservers: [ "8.8.8.8" ]
+      ip_version: 4
+
+  private_router:
+    type: OS::Neutron::Router
+    properties:
+      external_gateway_info: { network: public network }
+
+  private_router_interface:
+    type: OS::Neutron::RouterInterface
+    properties:
+      router_id: { get_resource: private_router }
+      subnet: { get_resource: private_subnet }
+
+
+  # create server ports (ip addresses)
+  # needed to configure ansible inventory and /etc/hosts
+  openshift_master_port:
+    type: OS::Neutron::Port
+    properties:
+       network: { get_resource: private_net }
+       security_groups:
+         - { get_resource: master_security_group }
+       fixed_ips:
+         - subnet_id: { get_resource: private_subnet }
+
+  openshift_node_01_port:
+    type: OS::Neutron::Port
+    properties:
+       network: { get_resource: private_net }
+       security_groups:
+         - { get_resource: node_security_group }
+       fixed_ips:
+         - subnet_id: { get_resource: private_subnet }
+
+  openshift_node_02_port:
+    type: OS::Neutron::Port
+    properties:
+       network: { get_resource: private_net }
+       security_groups:
+         - { get_resource: node_security_group }
+       fixed_ips:
+         - subnet_id: { get_resource: private_subnet }
+
+  openshift_master_lb_vip_port:
+    type: OS::Neutron::Port
+    properties:
+      security_groups: [{ get_resource: public_security_group }]
+      network: { get_resource: private_net }
+      fixed_ips:
+        - subnet_id: { get_resource: private_subnet }
+
+  openshift_master_lb_vip_floating_ip:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network_id: { get_param: public_net_id  }
+      port_id: { get_resource: openshift_master_lb_vip_port }
+
+  openshift_node_lb_vip_port:
+    type: OS::Neutron::Port
+    properties:
+      security_groups: [{ get_resource: public_security_group }]
+      network: { get_resource: private_net }
+      fixed_ips:
+        - subnet_id: { get_resource: private_subnet }
+
+  openshift_node_lb_vip_floating_ip:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network_id: { get_param: public_net_id  }
+      port_id: { get_resource: openshift_node_lb_vip_port }
+
+  nfs_server_port:
+    type: OS::Neutron::Port
+    properties:
+       network: { get_resource: private_net }
+       security_groups:
+         - { get_resource: node_security_group }
+       fixed_ips:
+         - subnet_id: { get_resource: private_subnet }
+
+
+  # nfs_server
+  nfs_server_public:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network_id: { get_param: public_net_id }
+      port_id: { get_resource: nfs_server_port }
+
+  nfs_server:
+    type: OS::Nova::Server
+    properties:
+      name: nfs_server
+      key_name: { get_param: key_name }
+      image: { get_param: image_id }
+      flavor: { get_param: node_instance_type }
+      networks:
+        - port: { get_resource: nfs_server_port }
+      availability_zone: blades
+      user_data_format: RAW
+      user_data:
+        str_replace:
+          params:
+            __openshift_master_ip__: { get_attr: [openshift_master_port, fixed_ips, 0, ip_address] }
+            __openshift_node_01_ip__: { get_attr: [openshift_node_01_port, fixed_ips, 0, ip_address] }
+            __openshift_node_02_ip__: { get_attr: [openshift_node_02_port, fixed_ips, 0, ip_address] }
+            __nfs_server_ip__: { get_attr: [nfs_server_port, fixed_ips, 0, ip_address] }
+          template: |
+            #!/bin/bash
+            yum -y update
+            yum -y install vim
+
+            user_with_sudo=centos
+
+            # Configure /etc/hosts
+            # This is not necesary in OpenStack Mitaka release
+            echo """
+            __openshift_master_ip__    openshift-master
+            __openshift_node_01_ip__    openshift-node-01
+            __openshift_node_02_ip__    openshift-node-02
+            __nfs_server_ip__        carrefour-nfs
+            """ >> /etc/hosts
+
+            yum -y install nfs-utils
+
+            mkdir /var/lib/exports
+            echo """
+            /var/lib/exports    openshift-node-01(rw,sync,no_root_squash,no_all_squash) openshift-node-02(rw,sync,no_root_squash,no_all_squash)
+            """ > /etc/exports
+
+            systemctl enable rpcbind
+            systemctl enable nfs-server
+            #systemctl enable nfs-lock
+            #systemctl enable nfs-idmap
+            systemctl start rpcbind
+            systemctl start nfs-server
+            #systemctl start nfs-lock
+            #systemctl start nfs-idmap
+
+
+  # openshift-node-01
+  openshift_node_01_public:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network_id: { get_param: public_net_id }
+      port_id: { get_resource: openshift_node_01_port }
+
+  openshift_node_01:
+    type: OS::Nova::Server
+    properties:
+      name: openshift-node-01
+      key_name: { get_param: key_name }
+      image: { get_param: image_id }
+      flavor: { get_param: node_instance_type }
+      networks:
+        - port: { get_resource: openshift_node_01_port }
+      availability_zone: blades
+      user_data_format: RAW
+      user_data:
+        str_replace:
+          params:
+            __openshift_master_ip__: { get_attr: [openshift_master_port, fixed_ips, 0, ip_address] }
+            __openshift_node_01_ip__: { get_attr: [openshift_node_01_port, fixed_ips, 0, ip_address] }
+            __openshift_node_02_ip__: { get_attr: [openshift_node_02_port, fixed_ips, 0, ip_address] }
+            __nfs_server_ip__: { get_attr: [nfs_server_port, fixed_ips, 0, ip_address] }
+          template: |
+            #!/bin/bash
+            #subscription-manager register --username __redhat__subscription_username__ --password __redhat_subscription_password__ --auto-attach
+            yum -y update
+            yum -y install vim
+            yum -y install docker
+            systemctl enable docker
+            yum -y install NetworkManager
+            systemctl enable NetworkManager
+            systemctl restart NetworkManager
+
+            user_with_sudo=centos
+
+            # Configure /etc/hosts
+            # This is not necesary in OpenStack Mitaka release
+            echo """
+            __openshift_master_ip__    openshift-master
+            __openshift_node_01_ip__    openshift-node-01
+            __openshift_node_02_ip__    openshift-node-02
+            __nfs_server_ip__        carrefour-nfs
+            """ >> /etc/hosts
+
+            yum -y install nfs-utils
+
+            systemctl enable rpcbind
+
+
+  # openshift-node-02
+  openshift_node_02_public:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network_id: { get_param: public_net_id }
+      port_id: { get_resource: openshift_node_02_port }
+
+  openshift_node_02:
+    type: OS::Nova::Server
+    properties:
+      name: openshift-node-02
+      key_name: { get_param: key_name }
+      image: { get_param: image_id }
+      flavor: { get_param: node_instance_type }
+      networks:
+        - port: { get_resource: openshift_node_02_port }
+      availability_zone: blades
+      user_data_format: RAW
+      user_data:
+        str_replace:
+          params:
+            __openshift_master_ip__: { get_attr: [openshift_master_port, fixed_ips, 0, ip_address] }
+            __openshift_node_01_ip__: { get_attr: [openshift_node_01_port, fixed_ips, 0, ip_address] }
+            __openshift_node_02_ip__: { get_attr: [openshift_node_02_port, fixed_ips, 0, ip_address] }
+            __nfs_server_ip__: { get_attr: [nfs_server_port, fixed_ips, 0, ip_address] }
+          template: |
+            #!/bin/bash
+            #subscription-manager register --username __redhat__subscription_username__ --password __redhat_subscription_password__ --auto-attach
+            yum -y update
+            yum -y install vim
+            yum -y install docker
+            systemctl enable docker
+            yum -y install NetworkManager
+            systemctl enable NetworkManager
+            systemctl restart NetworkManager
+
+            user_with_sudo=centos
+
+            # Configure /etc/hosts
+            # This is not necesary in OpenStack Mitaka release
+            echo """
+            __openshift_master_ip__    openshift-master
+            __openshift_node_01_ip__    openshift-node-01
+            __openshift_node_02_ip__    openshift-node-02
+            __nfs_server_ip__        carrefour-nfs
+            """ >> /etc/hosts
+
+            yum -y install nfs-utils
+
+            systemctl enable rpcbind
+
+
+  # openshift-master-01
+  openshift_master_public:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network_id: { get_param: public_net_id }
+      port_id: { get_resource: openshift_master_port }
+
+  openshift_master:
+    type: OS::Nova::Server
+    properties:
+      name: openshift-master
+      key_name: { get_param: key_name }
+      image: { get_param: image_id }
+      flavor: { get_param: master_instance_type }
+      networks:
+        - port: { get_resource: openshift_master_port }
+      availability_zone: blades
+      user_data_format: RAW
+      user_data:
+        str_replace:
+          params:
+            __id_rsa__: { get_param: id_rsa }
+            __id_rsa_pub__: { get_param: id_rsa_pub }
+            __openshift_master_ip__: { get_attr: [openshift_master_port, fixed_ips, 0, ip_address] }
+            __openshift_node_01_ip__: { get_attr: [openshift_node_01_port, fixed_ips, 0, ip_address] }
+            __openshift_node_02_ip__: { get_attr: [openshift_node_02_port, fixed_ips, 0, ip_address] }
+            __nfs_server_ip__: { get_attr: [nfs_server_port, fixed_ips, 0, ip_address] }
+            __openshift_master_lb_vip_floating_ip__: { get_attr: [openshift_master_lb_vip_floating_ip, floating_ip_address] }
+            __openshift_admin_username__: { get_param: openshift_admin__username }
+            __openshift_admin_password__: { get_param: openshift_admin_password }
+            __openshift_ansible_version__: { get_param: openshift_ansible_version }
+          template: |
+            #!/bin/bash
+            #subscription-manager register --username __redhat__subscription_username__ --password __redhat_subscription_password__ --auto-attach
+            yum -y update
+            yum -y install vim
+            yum -y install docker
+            systemctl enable docker
+            yum -y install NetworkManager
+            systemctl restart NetworkManager
+            systemctl enable NetworkManager
+
+            user_with_sudo=centos
+
+            # Configure ssh without password
+            # Set public and private keys on $user_with_sudo user
+            echo "__id_rsa__" | base64 -d > /home/$user_with_sudo/.ssh/id_rsa
+            chmod 600 /home/$user_with_sudo/.ssh/id_rsa
+            echo "__id_rsa_pub__" >> /home/$user_with_sudo/.ssh/authorized_keys
+            # Set config to not check ssh keys
+            echo """
+            Host *
+                StrictHostKeyChecking no
+                UserKnownHostsFile=/dev/null
+            """ > /home/$user_with_sudo/.ssh/config
+            # Fix permissions
+            chown -R $user_with_sudo:$user_with_sudo /home/$user_with_sudo/.ssh/
+
+            # Set private key on root user
+            echo "__id_rsa__" | base64 -d > /root/.ssh/id_rsa
+            chmod 600 /root/.ssh/id_rsa
+            # Set config to not check ssh keys
+            echo """
+            Host *
+                StrictHostKeyChecking no
+                UserKnownHostsFile=/dev/null
+            """ >> /root/.ssh/config
+
+            # Configure /etc/hosts
+            # This is not necesary in OpenStack Mitaka release
+            echo """
+            __openshift_master_ip__    openshift-master
+            __openshift_node_01_ip__    openshift-node-01
+            __openshift_node_02_ip__    openshift-node-02
+            __nfs_server_ip__        carrefour-nfs
+            """ >> /etc/hosts
+
+            # Install prerequirements
+            yum -y install epel-release
+            sed -i -e "s/^enabled=1/enabled=0/" /etc/yum.repos.d/epel.repo
+            yum -y --enablerepo=epel install ansible1.9 pyOpenSSL
+            yum -y install git wget curl docker
+
+            # Download openshift-ansible and set branch to prod
+            git clone https://github.com/openshift/openshift-ansible /home/$user_with_sudo/openshift-ansible
+            cd /home/$user_with_sudo/openshift-ansible
+            git checkout __openshift_ansible_version__
+
+            echo """
+            [OSEv3:children]
+            masters
+            nodes
+            etcd
+
+            [OSEv3:vars]
+            ansible_ssh_user=centos
+            ansible_become=true
+            ansible_become_method=sudo
+            ansible_become_user=root
+
+            deployment_type=origin
+
+            # Uncomment the following to enable htpasswd authentication; defaults to
+            # DenyAllPasswordIdentityProvider.
+            openshift_master_identity_providers=[{'challenge': 'true', 'filename': '/etc/origin/htpasswd', 'login': 'true', 'kind': 'HTPasswdPasswordIdentityProvider', 'name': 'htpasswd_auth'}]
+            # This does not work
+            #openshift_master_htpasswd_users={'admin': 'admin'}
+
+            # Pacemaker high availability cluster method.
+            # Pacemaker HA environment must be able to self provision the
+            # configured VIP. For installation openshift_master_cluster_hostname
+            # must resolve to the configured VIP.
+            openshift_master_cluster_method=native
+            openshift_master_cluster_hostname=__openshift_master_lb_vip_floating_ip__
+            openshift_master_cluster_public_hostname=__openshift_master_lb_vip_floating_ip__
+
+            # override the default controller lease ttl
+            osm_controller_lease_ttl=10
+
+            openshift_set_hostname=False
+
+            openshift_master_default_subdomain=paradigmadigital.com
+            osn_storage_plugin_deps=['nfs']
+
+            [masters]
+            __openshift_master_ip__ openshift_public_hostname='__openshift_master_ip__' openshift_hostname='__openshift_master_ip__'
+
+            [etcd]
+            __openshift_master_ip__ openshift_public_hostname='__openshift_master_ip__' openshift_hostname='__openshift_master_ip__'
+
+            [nodes]
+            __openshift_node_01_ip__ openshift_public_hostname='__openshift_node_01_ip__' openshift_hostname='__openshift_node_01_ip__' openshift_node_labels=\"{'region': 'primary', 'zone': 'zone1'}\" openshift_scheduleable=true dss_docker_device=/dev/vdb
+            __openshift_node_02_ip__ openshift_public_hostname='__openshift_node_02_ip__' openshift_hostname='__openshift_node_02_ip__' openshift_node_labels=\"{'region': 'primary', 'zone': 'zone2'}\" openshift_scheduleable=true dss_docker_device=/dev/vdb
+            """ > /home/$user_with_sudo/openshift-ansible/hosts
+
+
+            #cd /home/$user_with_sudo/openshift-ansible
+            #ansible-playbook playbooks/byo/config.yml -i hosts
+
+            #touch /etc/origin/htpasswd
+            #echo "__openshift_admin_password__" | htpasswd -i /etc/origin/htpasswd __openshift_admin_username__
+
+            #ansible-playbook playbooks/byo/config.yml -i hosts
+
+            #oadm registry --config=/etc/origin/master/admin.kubeconfig --credentials=/etc/origin/master/openshift-registry.kubeconfig
+
+            #echo '{"kind":"ServiceAccount","apiVersion":"v1","metadata":{"name":"router"}}' | oc create -f -
+            #oadm router haproxy --replicas=1 --credentials=/etc/origin/master/openshift-router.kubeconfig --service-account=router
+
+
+#------------------------------------#
+# OpenShift Load Balancer properties #
+#------------------------------------#
+  openshift_master_monitor:
+    type: OS::Neutron::HealthMonitor
+    properties:
+      type: TCP
+      delay: 15
+      max_retries: 5
+      timeout: 10
+
+  openshift_master_pool:
+    type: OS::Neutron::Pool
+    properties:
+      name: openshift_master_lb_front_pool
+      protocol: TCP
+      subnet_id: { get_resource: private_subnet }
+      lb_method: ROUND_ROBIN
+      monitors: [ { get_resource: openshift_master_monitor } ]
+      vip:
+        name: front_vip
+        description: Front-end virtual IP (VIP)
+        protocol_port: 8443
+#        session_persistence:
+#          type: SOURCE_IP
+
+  openshift_master_lb:
+    type: OS::Neutron::LoadBalancer
+    properties:
+      members: [ { get_resource: openshift_master } ]
+      pool_id: { get_resource: openshift_master_pool }
+      protocol_port: 8443
+
+  openshift_master_lb_pool_vip:
+    type: OS::Neutron::FloatingIPAssociation
+    properties:
+      floatingip_id: { get_resource: openshift_master_lb_vip_floating_ip }
+#      port_id: { 'Fn::Select': ['port_id', {get_attr: [pool, vip] } ] }
+      port_id: { get_attr: [ openshift_master_pool, vip, port_id ] }
+
+
+
+#--------------------------------#
+# Nodes Load Balancer properties #
+#--------------------------------#
+  openshift_node_monitor:
+    type: OS::Neutron::HealthMonitor
+    properties:
+      type: TCP
+      delay: 15
+      max_retries: 5
+      timeout: 10
+
+  openshift_node_pool:
+    type: OS::Neutron::Pool
+    properties:
+      name: openshift_node_lb_front_pool
+      protocol: TCP
+      subnet_id: { get_resource: private_subnet }
+      lb_method: ROUND_ROBIN
+      monitors: [ { get_resource: openshift_node_monitor } ]
+      vip:
+        name: front_vip
+        description: Front-end virtual IP (VIP)
+        protocol_port: 443
+#        session_persistence:
+#          type: SOURCE_IP
+
+  openshift_node_lb:
+    type: OS::Neutron::LoadBalancer
+    properties:
+      members: [ { get_resource: openshift_node_01 },{ get_resource: openshift_node_02 } ]
+      pool_id: { get_resource: openshift_node_pool }
+      protocol_port: 443
+
+  openshift_node_lb_pool_vip:
+    type: OS::Neutron::FloatingIPAssociation
+    properties:
+      floatingip_id: { get_resource: openshift_node_lb_vip_floating_ip }
+#      port_id: { 'Fn::Select': ['port_id', {get_attr: [pool, vip] } ] }
+      port_id: { get_attr: [ openshift_node_pool, vip, port_id ] }
