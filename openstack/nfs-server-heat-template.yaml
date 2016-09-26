@@ -1,15 +1,15 @@
 heat_template_version: 2016-04-08
 
-description: Despliegue de un servidor de NFS para drupal
+description: Despliegue de un servidor de NFS
 
 parameters:
   key_name:
     type: string
     label: Key Name
     description: Name of key-pair to be used for all compute instances
-    default: sistemas
     constraints:
       - custom_constraint: nova.keypair
+    default: tests
   image_id:
     type: string
     label: Image ID
@@ -29,11 +29,11 @@ parameters:
     label: Public network
     description: Public network
     default: 0e2ff1c5-fc78-4dd8-9c6d-5989794e9e71
-  private_net_id:
+  cidr:
     type: string
-    label: Private network
-    description: Private network
-    default: b59e8215-e15c-4fdb-ae7a-475d2780e797
+    label: Network CIDR
+    description: The CIDR of the private network.
+    default: 192.168.3.0/24
   availability_zone:
     type: string
     label: Availability Zone
@@ -57,13 +57,36 @@ resources:
         - remote_ip_prefix: 0.0.0.0/0
           protocol: icmp
 
+  # Network infraestructure
+  nfs_private_net:
+    type: OS::Neutron::Net
+
+  nfs_private_subnet:
+    type: OS::Neutron::Subnet
+    properties:
+      network_id: { get_resource: nfs_private_net }
+      cidr: { get_param: cidr }
+      dns_nameservers: [ "192.168.43.1", "192.168.32.1" ]
+      ip_version: 4
+
+  nfs_private_router:
+    type: OS::Neutron::Router
+    properties:
+      external_gateway_info: { network: public }
+
+  nfs_private_router_interface:
+    type: OS::Neutron::RouterInterface
+    properties:
+      router_id: { get_resource: nfs_private_router }
+      subnet: { get_resource: nfs_private_subnet }
+
 
   # create server ports (ip addresses)
   # needed to configure ansible inventory and /etc/hosts
   nfs_server_port:
     type: OS::Neutron::Port
     properties:
-       network: { get_param: private_net_id }
+       network: { get_resource: nfs_private_net }
        security_groups:
          - { get_resource: nfs_security_group }
 
