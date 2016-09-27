@@ -29,16 +29,11 @@ parameters:
     label: Public network
     description: Public network
     default: 0e2ff1c5-fc78-4dd8-9c6d-5989794e9e71
-  private_net_id:
+  cidr:
     type: string
-    label: Private network
-    description: Private network
-    default: b59e8215-e15c-4fdb-ae7a-475d2780e797
-  private_subnet_id:
-    type: string
-    label: Private Subnet
-    description: Private Subnet
-    default: 96ad9deb-c13c-45b4-8cab-d25bd65b6b50
+    label: Network CIDR
+    description: The CIDR of the private network.
+    default: 192.168.4.0/24
   availability_zone_drupal_1:
     type: string
     label: Availability Zone Drupal 1
@@ -113,27 +108,49 @@ resources:
         - remote_ip_prefix: 0.0.0.0/0
           protocol: icmp
 
+  # Network infraestructure
+  drupal_private_net:
+    type: OS::Neutron::Net
+
+  drupal_private_subnet:
+    type: OS::Neutron::Subnet
+    properties:
+      network_id: { get_resource: drupal_private_net }
+      cidr: { get_param: cidr }
+      dns_nameservers: [ "192.168.43.1", "192.168.32.1" ]
+      ip_version: 4
+
+  drupal_private_router:
+    type: OS::Neutron::Router
+    properties:
+      external_gateway_info: { network: public }
+
+  drupal_private_router_interface:
+    type: OS::Neutron::RouterInterface
+    properties:
+      router_id: { get_resource: drupal_private_router }
+      subnet: { get_resource: drupal_private_subnet }
 
   # create server ports (ip addresses)
   # needed to configure ansible inventory and /etc/hosts
   drupal1_server_port:
     type: OS::Neutron::Port
     properties:
-       network: { get_param: private_net_id }
+       network: { get_resource: drupal_private_net }
        security_groups:
          - { get_resource: drupal_security_group }
 
   drupal2_server_port:
     type: OS::Neutron::Port
     properties:
-       network: { get_param: private_net_id }
+       network: { get_resource: drupal_private_net }
        security_groups:
          - { get_resource: drupal_security_group }
 
   drupal3_server_port:
     type: OS::Neutron::Port
     properties:
-       network: { get_param: private_net_id }
+       network: { get_resource: drupal_private_net }
        security_groups:
          - { get_resource: drupal_security_group }
 
@@ -142,7 +159,7 @@ resources:
     type: OS::Neutron::Port
     properties:
       security_groups: [{ get_resource: drupal_security_group }]
-      network: { get_param: private_net_id }
+      network: { get_resource: drupal_private_net }
 
   drupal_lb_vip_floating_ip:
     type: OS::Neutron::FloatingIP
@@ -344,7 +361,7 @@ resources:
     properties:
       name: drupal_lb_pool
       protocol: TCP
-      subnet_id: { get_param: private_subnet_id }
+      subnet_id: { get_resource: drupal_private_subnet }
       lb_method: ROUND_ROBIN
       monitors: [ { get_resource: drupal_monitor } ]
       vip:
