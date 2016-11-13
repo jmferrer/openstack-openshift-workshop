@@ -12475,7 +12475,7 @@ service libvirt-bin start</code></pre>
 
 </div>
 </div>
-</div>
+</div></section><section>
 <div class="cell border-box-sizing text_cell rendered">
 <div class="prompt input_prompt">
 </div>
@@ -12583,16 +12583,44 @@ Hay muuuuuuuuchos componentes.</p>
 <h3 id="&#191;Complejidad?">&#191;Complejidad?<a class="anchor-link" href="#&#191;Complejidad?">&#182;</a></h3><p>Un gran poder conlleva una gran responsabilidad.</p>
 <p>El gran poder que supone poder ver las tripas de la aplicación no significa que tengamos que hacerlo.</p>
 <p>¿Que harías si ...</p>
+
+</div>
+</div>
+</div><div class="fragment">
+<div class="cell border-box-sizing text_cell rendered">
+<div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
 <ul>
 <li>un desarrollador se niega a usar bases de datos porque no entiende como funcionan las tripas</li>
-<li>un desarrollador se niega a utilizar un framework porque no le ha dado tiempo a ver como funcionan las tripas
-?</li>
 </ul>
+
+</div>
+</div>
+</div></div><div class="fragment">
+<div class="cell border-box-sizing text_cell rendered">
+<div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<ul>
+<li>un desarrollador se niega a utilizar un framework porque no le ha dado tiempo a ver como funcionan las tripas?</li>
+</ul>
+
+</div>
+</div>
+</div></div><div class="fragment">
+<div class="cell border-box-sizing text_cell rendered">
+<div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
 <p>¡Abstracción por favor!</p>
 
 </div>
 </div>
-</div></section></section><section><section>
+</div></div></section></section><section><section>
 <div class="cell border-box-sizing text_cell rendered">
 <div class="prompt input_prompt">
 </div>
@@ -12782,25 +12810,25 @@ oc new-app -f drupal-openshift-persistent-template.yaml -p DRUPAL_HOSTNAME=drupa
 
 </div>
 </div>
-</div></section><section>
+</div>
 <div class="cell border-box-sizing text_cell rendered">
 <div class="prompt input_prompt">
 </div>
 <div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<p>Tecnología disruptiva hace que las personas que no sepan manejarla se queden fuera del mercado laboral</p>
+<p>OpenShift permite a los desarrolladores hacer su trabajo de una forma ágil sin "invadir" el terreno de sistemas creando varios entornos.</p>
+<p>Convierte una infraestructura estática en una infraestructura dinámica.</p>
 
 </div>
 </div>
-</div>
+</div></section></section><section><section>
 <div class="cell border-box-sizing text_cell rendered">
 <div class="prompt input_prompt">
 </div>
 <div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h2 id="Qu&#233;-es-OpenShift">Qu&#233; es OpenShift<a class="anchor-link" href="#Qu&#233;-es-OpenShift">&#182;</a></h2><p>Son varias capas:</p>
+<h2 id="Qu&#233;-es-OpenShift">Qu&#233; es OpenShift<a class="anchor-link" href="#Qu&#233;-es-OpenShift">&#182;</a></h2><p>Son varias capas</p>
 <ul>
-<li>Linux</li>
 <li>Contenedores, cgroups, ...</li>
 <li>Docker</li>
 <li>Kubernetes</li>
@@ -12809,7 +12837,115 @@ oc new-app -f drupal-openshift-persistent-template.yaml -p DRUPAL_HOSTNAME=drupa
 
 </div>
 </div>
-</div></section></section><section><section>
+</div></section><section>
+<div class="cell border-box-sizing text_cell rendered">
+<div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h3 id="Linux">Linux<a class="anchor-link" href="#Linux">&#182;</a></h3><p>Linux ofrece servicios de bajo nivel que nos
+permite una gestión de recursos muy fina.</p>
+<p>Por cada proceso podemos tener:</p>
+<ul>
+<li>“cuotas”: de memoria, cpu, ...</li>
+<li>“permisos”: de acceso a dispositivos, ...</li>
+<li>“jaulas”: en el sistema de archivos.</li>
+</ul>
+
+</div>
+</div>
+</div></section><section>
+<div class="cell border-box-sizing text_cell rendered">
+<div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h3 id="Contenedores">Contenedores<a class="anchor-link" href="#Contenedores">&#182;</a></h3><p>Creamos un proceso al que asignamos una interfaz de red con una IP, un espacio en el sistema de archivos,
+una cuota de disco, memoria, cpu, ... un entorno aislado.</p>
+<p>Todos los hijos de un proceso “heredan” lo que tiene el padre.
+¿Y si el padre es el proceso de arranque del sistema?</p>
+<p>¡¡La tecnología de contenedores es muy antigua!!</p>
+<p>Cuando contratas un VPS en un proveedor estás contratando un contenedor.</p>
+<p>OpenVZ, LXC, Linux-vServer son ejemplos de gestores de contenedores.</p>
+
+</div>
+</div>
+</div></section><section>
+<div class="cell border-box-sizing text_cell rendered">
+<div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h3 id="Docker">Docker<a class="anchor-link" href="#Docker">&#182;</a></h3><p>Hace los contenedores más útiles a los desarrolladores:</p>
+<ul>
+<li>creando dockerhub</li>
+<li>creando proceso de construcción de imágenes</li>
+<li>creando docker-machine, docker-compose</li>
+<li>facilitando la gestión de la red</li>
+<li>usando un sistema de archivos en capas</li>
+<li>facilitando el uso del almacenamiento externo al contenedor</li>
+<li>...
+¡¡¡¡¡ DOCKER != CONTENEDORES !!!!!</li>
+</ul>
+
+</div>
+</div>
+</div></section><section>
+<div class="cell border-box-sizing text_cell rendered">
+<div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h3 id="Kubernetes">Kubernetes<a class="anchor-link" href="#Kubernetes">&#182;</a></h3><p>Google ve que Docker es una buena solución pero ¿como hago para desplegar servicios con docker en miles de servidores?</p>
+<p>Si quiero desplegar una aplicación en tres CPDs distintos y queremos que en cada CPD haya 3 copias del servicio en tres servidores distintos. ¿Me conecto por ssh a los 9 servidores o creo Kubernetes y gestiono los nodos de aplicación mediante su api?</p>
+<p>Kubernetes:</p>
+<ul>
+<li>agrega el rol de servidores master que gestionarán a los de aplicación</li>
+<li>agrega redes compartidas entre los nodos de aplicación</li>
+<li>agrega los conceptos de:<ul>
+<li>pod: conjunto de dockers que deben ir siempre juntos</li>
+<li>replication controller: siempre hay arrancados el número de pods que se le piden</li>
+<li>service: punto único de entrada a los pods que forman un replication controller. Como si fuera un balanceador.</li>
+</ul>
+</li>
+<li>...</li>
+</ul>
+
+</div>
+</div>
+</div></section><section>
+<div class="cell border-box-sizing text_cell rendered">
+<div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h3 id="OpenShift">OpenShift<a class="anchor-link" href="#OpenShift">&#182;</a></h3><p>Se ocupa del despliegue de código en una plataforma. En la versión 3 utiliza Kubernetes pero en la versión 2 usaba otra cosa.
+En un coche OpenShift sería los asientos, el volante, la radio, los botones del salpicadero y todo lo que ves del coche.
+OpenShift:</p>
+<ul>
+<li>define como servicio básico el router</li>
+<li>agrega una mejor gestión de usuarios y grupos</li>
+<li>incrementa la seguridad con selinux y políticas de acceso</li>
+<li>extiende kubernetes con nuevas funcionalidades</li>
+<li>integra los servicios de métricas, logging, registry, ...</li>
+<li>crea nuevos procedimientos para los desarrolladores</li>
+<li>...</li>
+<li>lo remata con una estupenda consola web</li>
+</ul>
+
+</div>
+</div>
+</div><div class="fragment">
+<div class="cell border-box-sizing text_cell rendered">
+<div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>¡y tiene un api para desarrollar aplicaciones propias! <a href="https://docs.openshift.org/latest/rest_api/index.html">https://docs.openshift.org/latest/rest_api/index.html</a></p>
+
+</div>
+</div>
+</div></div></section></section><section><section>
 <div class="cell border-box-sizing text_cell rendered">
 <div class="prompt input_prompt">
 </div>
@@ -12874,6 +13010,111 @@ oc new-app -f drupal-openshift-persistent-template.yaml -p DRUPAL_HOSTNAME=drupa
 <div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
 <h3 id="&#161;No-es-ninguna-de-esas-cosas!"><em>&#161;No es ninguna de esas cosas!</em><a class="anchor-link" href="#&#161;No-es-ninguna-de-esas-cosas!">&#182;</a></h3>
+</div>
+</div>
+</div></div></section></section><section><section>
+<div class="cell border-box-sizing text_cell rendered">
+<div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h2 id="Gesti&#243;n-razonable-de-recursos">Gesti&#243;n razonable de recursos<a class="anchor-link" href="#Gesti&#243;n-razonable-de-recursos">&#182;</a></h2><p><img src="montondedinero.jpeg"></p>
+
+</div>
+</div>
+</div></section><section>
+<div class="cell border-box-sizing text_cell rendered">
+<div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h2 id="&#191;Est&#225;n-los-grandes-a-salvo?">&#191;Est&#225;n los grandes a salvo?<a class="anchor-link" href="#&#191;Est&#225;n-los-grandes-a-salvo?">&#182;</a></h2><p>Empresa que se dedica a la venta:</p>
+<ul>
+<li>ve que surge Amazon y no hace nada porque le va bien</li>
+<li>ve que Amazon deja de vender libros para vender más cosas y no hace nada porque le va bien</li>
+<li>ve que Amazon hace un primer piloto para vender productos frescos y no hace nada porque le va bien</li>
+<li>Amazon se posiciona el primero y el mercado cambia -&gt; too late my friend!</li>
+</ul>
+
+</div>
+</div>
+</div></section></section><section><section>
+<div class="cell border-box-sizing text_cell rendered">
+<div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h2 id="El-mileniarismo-va-a-llegarrrrrrrrr">El mileniarismo va a llegarrrrrrrrr<a class="anchor-link" href="#El-mileniarismo-va-a-llegarrrrrrrrr">&#182;</a></h2><p><img src="miedo.jpg"></p>
+
+</div>
+</div>
+</div></section><section>
+<div class="cell border-box-sizing text_cell rendered">
+<div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h3 id="Evoluci&#243;n">Evoluci&#243;n<a class="anchor-link" href="#Evoluci&#243;n">&#182;</a></h3><p>Manual -&gt; mixto -&gt; código</p>
+
+</div>
+</div>
+</div></section><section>
+<div class="cell border-box-sizing text_cell rendered">
+<div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h3 id="Velocidad">Velocidad<a class="anchor-link" href="#Velocidad">&#182;</a></h3><p>La diferencia entre usar cloud para un despliegue es tan grande que si se nota a alto nivel en cuestión de costes.</p>
+
+</div>
+</div>
+</div></section><section>
+<div class="cell border-box-sizing text_cell rendered">
+<div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h3 id="&#191;Y-las-personas?">&#191;Y las personas?<a class="anchor-link" href="#&#191;Y-las-personas?">&#182;</a></h3>
+</div>
+</div>
+</div><div class="fragment">
+<div class="cell border-box-sizing text_cell rendered">
+<div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>Los sysadmins tienen una hipoteca, familia, ... y una forma de trabajar.</p>
+
+</div>
+</div>
+</div></div><div class="fragment">
+<div class="cell border-box-sizing text_cell rendered">
+<div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>Las personas que ahora mismo no</p>
+
+</div>
+</div>
+</div></div><div class="fragment">
+<div class="cell border-box-sizing text_cell rendered">
+<div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>Tecnología disruptiva hace que las personas que no sepan manejarla se queden fuera del mercado laboral</p>
+
+</div>
+</div>
+</div></div><div class="fragment">
+<div class="cell border-box-sizing text_cell rendered">
+<div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>Hay mucha gente en esta situación.</p>
+
 </div>
 </div>
 </div></div></section></section>

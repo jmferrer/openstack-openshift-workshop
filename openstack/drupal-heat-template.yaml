@@ -9,7 +9,7 @@ parameters:
     description: Name of key-pair to be used for all compute instances
     constraints:
       - custom_constraint: nova.keypair
-    default: sistemas
+    default: tests
   image_id:
     type: string
     label: Image ID
@@ -209,8 +209,7 @@ resources:
 
             mount /var/www/html/sites/default
 
-            echo """
-            <?php
+            echo """<?php
 
             \$databases = array (
               'default' =>
